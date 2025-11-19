@@ -2,7 +2,7 @@
 const { Sequelize } = require('sequelize');
 const createCategoryModel = require('./category');
 const createSpecialtyModel = require('./specialty');
-const createArtisanModel = require('./artisan');
+const createArtisanModel = require('./artisans');
 const createMessageContactModel = require('./messageContact');
 
 // � À adapter avec tes vraies variables d'env

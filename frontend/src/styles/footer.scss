@@ -1,0 +1,31 @@
+@import "variables";
+
+.site-footer {
+  background-color: $color-dark-blue;
+  color: #ffffff;
+
+  .footer-title {
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+  }
+
+  .footer-links {
+    li {
+      margin-bottom: 0.2rem;
+
+      a {
+        color: #ffffff;
+        text-decoration: none;
+
+        &:hover {
+          text-decoration: underline;
+          color: $color-light-blue;
+        }
+      }
+    }
+  }
+
+  .footer-address {
+    line-height: 1.5;
+  }
+}

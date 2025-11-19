@@ -1,141 +1,157 @@
-// src/components/ArtisanList.jsx
-import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { fetchArtisans } from "../services/api";
-import StarRating from "./StarRating";
+// src/pages/ArtisansList.jsx
+import React, { useEffect, useState } from "react";
+import { Link, useLocation } from "react-router-dom";
 
-export default function ArtisanList() {
+const API_BASE_URL = "http://localhost:3001";
+
+function useQuery() {
+  const { search } = useLocation();
+  return new URLSearchParams(search);
+}
+
+function ArtisansList() {
   const [artisans, setArtisans] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("all");
+  const [error, setError] = useState(null);
 
-  const navigate = useNavigate();
+  const query = useQuery();
+  const searchTerm = (query.get("q") || "").toLowerCase();
+  const categoryFilter = (query.get("categorie") || "").toLowerCase();
 
   useEffect(() => {
-    fetchArtisans()
-      .then(setArtisans)
-      .catch(console.error)
-      .finally(() => setLoading(false));
+    async function fetchArtisans() {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const res = await fetch(`${API_BASE_URL}/api/artisans`);
+        let data;
+
+        try {
+          data = await res.json();
+        } catch (jsonErr) {
+          console.error("Réponse /api/artisans non JSON :", jsonErr);
+          setError("La réponse du serveur n'est pas au format JSON.");
+          return;
+        }
+
+        if (!res.ok) {
+          console.error("Erreur HTTP /api/artisans :", res.status, data);
+          setError("Impossible de charger les artisans.");
+          return;
+        }
+
+        if (!Array.isArray(data)) {
+          console.error("Format inattendu de /api/artisans :", data);
+          setError("Format de données incorrect.");
+          return;
+        }
+
+        setArtisans(data);
+      } catch (err) {
+        console.error("Erreur fetch /api/artisans :", err);
+        setError("Erreur de connexion au serveur.");
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchArtisans();
   }, []);
 
-  // liste des catégories à partir des données
-  const categories = useMemo(() => {
-    const set = new Set();
-    artisans.forEach((artisan) => {
-      const catName = artisan.specialty.category.nom_categorie;
-      if (catName) set.add(catName);
-    });
-    return Array.from(set);
-  }, [artisans]);
+  const renderStars = (note) => {
+    if (note == null) return "Aucune note";
+    const rounded = Math.round(Number(note));
+    const stars = Array.from({ length: 5 }, (_, i) =>
+      i < rounded ? "★" : "☆"
+    ).join("");
+    return `${stars} (${note}/5)`;
+  };
 
-  // filtrage par recherche + catégorie
-  const filteredArtisans = artisans.filter((artisan) => {
-    const searchLower = search.toLowerCase();
+  const filteredArtisans = artisans.filter((a) => {
+    // filtre recherche sur le nom de l'artisan
+    const matchSearch =
+      !searchTerm ||
+      (a.nom_artisan &&
+        a.nom_artisan.toLowerCase().includes(searchTerm));
 
-    const matchesSearch =
-      artisan.nom_artisan.toLowerCase().includes(searchLower) ||
-      artisan.ville.toLowerCase().includes(searchLower) ||
-      artisan.specialty.nom_specialite
-        .toLowerCase()
-        .includes(searchLower);
+    // filtre catégorie sur le NOM de la catégorie
+    const artisanCategoryName =
+      a.specialty.category.nom_categorie.toLowerCase() || "";
 
-    const catName = artisan.specialty.category.nom_categorie;
-    const matchesCategory =
-      selectedCategory === "all" || catName === selectedCategory;
+    const matchCategory =
+      !categoryFilter || artisanCategoryName === categoryFilter;
 
-    return matchesSearch && matchesCategory;
+    return matchSearch && matchCategory;
   });
 
-  if (loading) return <p>Chargement...</p>;
-
   return (
-    <div style={{ maxWidth: "1000px", margin: "0 auto", padding: "1.5rem" }}>
-      <h1 style={{ marginBottom: "1rem" }}>Trouve ton artisan</h1>
+    <div className="container py-5">
+      <h1 className="mb-4">Liste des artisans</h1>
 
-      {/* recherche + filtre catégorie */}
-      <div
-        style={{
-          display: "flex",
-          gap: "1rem",
-          marginBottom: "1.5rem",
-          flexWrap: "wrap",
-        }}
-      >
-        <input
-          type="text"
-          placeholder="Rechercher par nom, ville, spécialité..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          style={{
-            flex: "1",
-            minWidth: "220px",
-            padding: "0.5rem 0.75rem",
-            borderRadius: "8px",
-            border: "1px solid #ccc",
-          }}
-        />
-
-        <select
-          value={selectedCategory}
-          onChange={(e) => setSelectedCategory(e.target.value)}
-          style={{
-            padding: "0.5rem 0.75rem",
-            borderRadius: "8px",
-            border: "1px solid #ccc",
-            minWidth: "180px",
-          }}
-        >
-          <option value="all">Toutes les catégories</option>
-          {categories.map((cat) => (
-            <option key={cat} value={cat}>
-              {cat}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {/* cards artisans */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
-          gap: "1rem",
-        }}
-      >
-        {filteredArtisans.map((artisan) => (
-          <button
-            key={artisan.id_artisan}
-            onClick={() => navigate(`/artisans/${artisan.id_artisan}`)}
-            style={{
-              textAlign: "left",
-              padding: "1rem",
-              borderRadius: "12px",
-              border: "1px solid #ddd",
-              backgroundColor: "white",
-              cursor: "pointer",
-              boxShadow: "0 2px 6px rgba(0,0,0,0.05)",
-            }}
-          >
-            <h3 style={{ margin: "0 0 0.5rem" }}>{artisan.nom_artisan}</h3>
-            <StarRating note={artisan.note} />
-            <p style={{ margin: "0.5rem 0 0" }}>
-              <strong>Spécialité : </strong>
-              {artisan.specialty.nom_specialite || "Non renseignée"}
-            </p>
-            <p style={{ margin: "0.25rem 0 0" }}>
-              <strong>Localisation : </strong>
-              {artisan.ville}
-            </p>
-          </button>
-        ))}
-      </div>
-
-      {filteredArtisans.length === 0 && (
-        <p style={{ marginTop: "1rem" }}>
-          Aucun artisan ne correspond à votre recherche.
+      {(searchTerm || categoryFilter) && (
+        <p className="mb-3">
+          Filtres appliqués :
+          {searchTerm && (
+            <>
+              {" "}
+              recherche = <strong>{searchTerm}</strong>
+            </>
+          )}
+          {categoryFilter && (
+            <>
+              {" "}
+              / catégorie = <strong>{categoryFilter}</strong>
+            </>
+          )}
         </p>
       )}
+
+      {loading && <p>Chargement des artisans...</p>}
+      {error && <p style={{ color: "red" }}>{error}</p>}
+
+      {!loading && !error && filteredArtisans.length === 0 && (
+        <p>Aucun artisan ne correspond à votre recherche.</p>
+      )}
+
+      <div className="row">
+        {filteredArtisans.map((artisan) => (
+          <div
+            key={artisan.id_artisan || artisan.id}
+            className="col-md-4 mb-3"
+          >
+            <div className="card h-100">
+              <div className="card-body">
+                <h5 className="card-title">{artisan.nom_artisan}</h5>
+
+                <p className="card-text mb-1">
+                  <strong>Note :</strong> {renderStars(artisan.note)}
+                </p>
+
+                <p className="card-text mb-1">
+                  <strong>Spécialité :</strong>{" "}
+                  {artisan.specialty
+                    ? artisan.specialty.nom_specialite
+                    : "Non renseignée"}
+                </p>
+
+                <p className="card-text mb-1">
+                  <strong>Localisation :</strong> {artisan.ville}
+                </p>
+
+                <Link
+                  to={`/artisans/${artisan.id_artisan || artisan.id}`}
+                  className="stretched-link"
+                >
+                  Voir la fiche complète
+                </Link>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
+
+export default ArtisansList;
